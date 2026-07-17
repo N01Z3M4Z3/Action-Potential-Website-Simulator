@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of an Impulse: Action Potential Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #090d12;
+    --bg-2: #0d131a;
+    --panel: #101720;
+    --panel-2: #151e29;
+    --line: #232f3b;
+    --line-soft: #1a232d;
+    --text: #e7eef2;
+    --text-dim: #7f96a3;
+    --text-dimmer: #556773;
+    --teal: #45e0b3;
+    --teal-dim: #1f6e5a;
+    --coral: #ff6f4d;
+    --coral-dim: #7a3626;
+    --blue: #5b8def;
+    --blue-dim: #2c4674;
+    --violet: #b78bff;
+    --violet-dim: #4a3a70;
+    --myelin: #223447;
+    --axon-core: #33465a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #0f1922 0%, transparent 60%),
+      radial-gradient(1000px 600px at 100% 110%, #0c1620 0%, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--teal);
+    display:block;
+    margin-bottom:6px;
+  }
+  .app{
+    max-width:1300px;
+    margin:0 auto;
+    padding:28px 24px 60px;
+  }
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:20px;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--line-soft);
+    padding-bottom:20px;
+    margin-bottom:18px;
+  }
+  .brand h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(26px, 4vw, 38px);
+    font-weight:600;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .brand p{
+    margin:8px 0 0;
+    color:var(--text-dim);
+    font-size:14px;
+    max-width:520px;
+    line-height:1.5;
+  }
+  .btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:0.03em;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--text);
+    padding:11px 16px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, transform .1s ease;
+    white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--teal-dim); background:#182029;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{
+    background:linear-gradient(180deg, #163f34, #0f2a23);
+    border-color:var(--teal-dim);
+    color:#c9fbe9;
+  }
+  .btn-primary:hover{border-color:var(--teal);}
+  .btn-simulate{
+    background:linear-gradient(180deg, #1c4238, #122a24);
+    border-color:var(--teal-dim);
+    color:#d3fdec;
+    width:100%;
+    padding:13px 16px;
+    font-size:13px;
+    margin-top:18px;
+    white-space:normal;
+    line-height:1.35;
+    text-align:center;
+  }
+  .btn-simulate:disabled{opacity:.45; cursor:default;}
+  .btn-simulate:hover:not(:disabled){border-color:var(--teal); background:linear-gradient(180deg, #204c40, #163329);}
+
+  .tracker{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+  .tracker .dot{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--text-dimmer);
+    border:1px solid var(--line-soft);
+    border-radius:20px;
+    padding:6px 12px 6px 8px;
+    cursor:pointer;
+    transition:all .15s ease;
+    background:var(--panel);
+  }
+  .tracker .dot .num{
+    width:18px;height:18px;border-radius:50%;
+    background:var(--line-soft);
+    color:var(--text-dim);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;
+  }
+  .tracker .dot.active{
+    color:var(--text); border-color:var(--teal-dim); background:#101c19;
+  }
+  .tracker .dot.active .num{background:var(--teal); color:#052018;}
+  .tracker .dot.done .num{background:var(--blue-dim); color:#cfe0ff;}
+
+  .layout{
+    display:grid;
+    grid-template-columns: 1fr 320px;
+    gap:18px;
+    align-items:start;
+  }
+  @media (max-width: 880px){
+    .layout{grid-template-columns: 1fr;}
+  }
+
+  .diagram-card{
+    background:linear-gradient(180deg, var(--panel), var(--bg-2));
+    border:1px solid var(--line-soft);
+    border-radius:14px;
+    padding:6px;
+    position:relative;
+    overflow:hidden;
+  }
+  .diagram-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio: 1700 / 620;
+    border-radius:10px;
+    overflow:hidden;
+    background:
+      radial-gradient(600px 300px at 20% 30%, #0e1720 0%, transparent 60%),
+      #0a0f15;
+  }
+  svg#neuronSvg{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .hotspot{
+    fill:rgba(69,224,179,0.0);
+    stroke:none;
+    cursor:pointer;
+  }
+  .hotspot:hover{fill:rgba(69,224,179,0.07);}
+  .hotspot-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    fill:var(--text-dimmer);
+    pointer-events:none;
+    letter-spacing:0.05em;
+    text-anchor:middle;
+    dominant-baseline:central;
+  }
+  .hotspot-ring{
+    fill:none;
+    stroke:var(--teal-dim);
+    stroke-width:1.5;
+    opacity:0.55;
+    pointer-events:none;
+  }
+  .hotspot-group.active .hotspot-ring{stroke:var(--teal); opacity:1;}
+  .hotspot-group.active .hotspot-label{fill:var(--teal);}
+
+  .channel .gate-base{ fill:#141d26; stroke:#2c3c4c; stroke-width:1; }
+  .channel .flap{
+    fill:#3a4f66; stroke:#5a7690; stroke-width:1;
+    transition: transform .38s cubic-bezier(.34,1.2,.4,1);
+  }
+  .channel .flap-left{ transform-origin: -12px 10px; transform: rotate(0deg); }
+  .channel .flap-right{ transform-origin: 12px 10px; transform: rotate(0deg); }
+  .channel.open .flap-left{ transform: rotate(-58deg); }
+  .channel.open .flap-right{ transform: rotate(58deg); }
+  .channel.open .flap{ fill:#4a6580; }
+  .channel.partial-open .flap-left{ transform: rotate(-18deg); }
+  .channel.partial-open .flap-right{ transform: rotate(18deg); }
+  .channel.blocked .flap{ fill:#7a3626; stroke:#a8503f; }
+  .channel.blocked .gate-base{ fill:#2a1512; }
+  .ion-orb{ filter:url(#glowSoft); }
+
+  .bare-highlight{ opacity:0; }
+  #myelinSegments{ transition: opacity .4s ease; }
+
+  .zoom-hint{
+    position:absolute;
+    bottom:10px; left:14px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--text-dimmer);
+    letter-spacing:0.04em;
+    pointer-events:none;
+  }
+  .legend{
+    position:absolute;
+    bottom:10px; right:10px;
+    background:rgba(16,23,32,0.88);
+    border:1px solid var(--line-soft);
+    border-radius:9px;
+    padding:9px 12px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    pointer-events:none;
+    backdrop-filter:blur(2px);
+  }
+  .legend-title{
+    font-size:9.5px;
+    letter-spacing:0.12em;
+    color:var(--text-dimmer);
+    margin-bottom:6px;
+  }
+  .legend-row{
+    display:flex; align-items:center; gap:7px;
+    margin:3px 0;
+    white-space:nowrap;
+  }
+  .legend-row .swatch{
+    width:9px; height:9px; border-radius:50%;
+    display:inline-block;
+    flex-shrink:0;
+  }
+  .struct-label{
+    font-family:'IBM Plex Mono', monospace;
+    pointer-events:none;
+  }
+  .leader-line{
+    stroke:#3a4a58;
+    stroke-width:1;
+    stroke-dasharray:2,2;
+    opacity:0.7;
+  }
+  .reset-btn{
+    position:absolute;
+    top:10px; right:10px;
+    z-index:5;
+  }
+
+  .info-panel{
+    background:linear-gradient(180deg, var(--panel), var(--bg-2));
+    border:1px solid var(--line-soft);
+    border-radius:14px;
+    padding:22px;
+    min-height:420px;
+    display:flex;
+    flex-direction:column;
+  }
+  .info-panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:22px;
+    margin:0 0 12px;
+    font-weight:600;
+  }
+  .info-panel p{
+    color:var(--text-dim);
+    font-size:13.5px;
+    line-height:1.65;
+    margin:0;
+  }
+  .info-panel .placeholder{
+    color:var(--text-dimmer);
+    font-size:13.5px;
+    line-height:1.6;
+    margin-top:60px;
+    text-align:center;
+  }
+  .info-tag{
+    display:inline-block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    padding:3px 8px;
+    border-radius:20px;
+    margin:14px 4px 0 0;
+    border:1px solid var(--line);
+    color:var(--text-dim);
+  }
+
+  .scope-card{
+    margin-top:16px;
+    background:linear-gradient(180deg, #0c1219, #0a0f14);
+    border:1px solid var(--line-soft);
+    border-radius:14px;
+    padding:16px 18px 8px;
+  }
+  .scope-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:8px;
+  }
+  .scope-head .title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14px;
+    color:var(--text-dim);
+    letter-spacing:0.02em;
+  }
+  .scope-head .reading{
+    font-size:13px;
+    color:var(--teal);
+  }
+  canvas#scope{
+    width:100%;
+    height:150px;
+    display:block;
+    border-radius:8px;
+  }
+
+  footer.credits{
+    margin-top:22px;
+    text-align:center;
+    color:var(--text-dimmer);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.04em;
+  }
+
+  ::selection{background:var(--teal-dim); color:#fff;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="eyebrow">Neuroscience · Interactive</span>
+      <h1>Anatomy of an Impulse</h1>
+      <p style="color:var(--text-dimmer); font-style:italic; margin:6px 0 0;">ignore jank please, I had to make this in 3 days</p>
+      <p>One neuron, six stops. Click a numbered marker to zoom in, read what's happening there, then run the simulation for that stage. Or run the whole signal end to end.</p>
+    </div>
+    <button class="btn btn-primary" id="playAllBtn">▶ Run full impulse</button>
+  </div>
+
+  <div class="tracker" id="tracker"></div>
+
+  <div class="layout">
+    <div class="diagram-card">
+      <div class="diagram-wrap">
+        <button class="btn reset-btn" id="resetBtn" style="display:none;">⤢ Zoom out</button>
+        <svg id="neuronSvg" viewBox="0 0 1700 620" xmlns="http://www.w3.org/2000/svg">
+
+          <defs>
+            <radialGradient id="somaGlow" cx="50%" cy="45%" r="65%">
+              <stop offset="0%" stop-color="#1c3d34"/>
+              <stop offset="100%" stop-color="#0e1c19"/>
+            </radialGradient>
+            <linearGradient id="axonGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#33465a"/>
+              <stop offset="100%" stop-color="#2a3a4a"/>
+            </linearGradient>
+            <filter id="glowSoft" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="6" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <filter id="glowStrong" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="12" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <linearGradient id="bareGrad" gradientUnits="userSpaceOnUse" x1="430" y1="0" x2="500" y2="0">
+              <stop offset="0" stop-color="#ff6f4d" stop-opacity="0"/>
+              <stop offset="0.5" stop-color="#ff6f4d" stop-opacity="1"/>
+              <stop offset="1" stop-color="#ff6f4d" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+
+          <rect x="0" y="0" width="1700" height="620" fill="transparent"/>
+
+          <g id="nextNeuronGhost" opacity="0.5">
+            <path d="M1460,250 C1500,220 1540,205 1585,190" stroke="#2a3a48" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M1460,270 C1505,260 1550,255 1595,255" stroke="#2a3a48" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M1460,310 C1500,320 1545,325 1590,320" stroke="#2a3a48" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M1460,340 C1500,365 1540,385 1580,405" stroke="#2a3a48" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M1460,290 C1495,290 1530,290 1560,290" stroke="#2a3a48" stroke-width="4" fill="none" stroke-linecap="round"/>
+          </g>
+
+          <g id="stageDendrites">
+            <g id="dendriteBranches" stroke="#3a5064" stroke-width="5" fill="none" stroke-linecap="round">
+              <path d="M40,120 C90,140 130,170 178,210"/>
+              <path d="M30,190 C80,195 130,215 190,245"/>
+              <path d="M35,260 C85,255 135,265 195,285"/>
+              <path d="M40,330 C90,320 140,315 195,315"/>
+              <path d="M35,400 C85,385 135,375 195,350"/>
+              <path d="M45,470 C95,440 140,410 190,380"/>
+              <path d="M90,150 C110,175 130,195 160,220"/>
+              <path d="M90,440 C115,415 140,395 165,370"/>
+            </g>
+            <g id="dendriteTips" fill="#3a5064">
+              <circle cx="40" cy="120" r="4"/><circle cx="30" cy="190" r="4"/>
+              <circle cx="35" cy="260" r="4"/><circle cx="40" cy="330" r="4"/>
+              <circle cx="35" cy="400" r="4"/><circle cx="45" cy="470" r="4"/>
+              <circle cx="90" cy="150" r="4"/><circle cx="90" cy="440" r="4"/>
+            </g>
+            <circle id="somaBody" cx="255" cy="310" r="92" fill="url(#somaGlow)" stroke="#2f4a40" stroke-width="3"/>
+            <circle id="nucleus" cx="235" cy="300" r="34" fill="#132720" stroke="#264a3d" stroke-width="2"/>
+            <circle cx="235" cy="300" r="10" fill="#1c352b"/>
+          </g>
+
+          <g id="stageHillock">
+            <path id="hillockShape" d="M330,255 C400,270 420,290 430,310 C420,330 400,350 330,365 Z" fill="#324356" stroke="#42586c" stroke-width="2"/>
+          </g>
+
+          <g id="stageAxon">
+            <line x1="430" y1="310" x2="1270" y2="310" stroke="url(#axonGrad)" stroke-width="14" stroke-linecap="round"/>
+            <g id="myelinSegments" fill="var(--myelin)" stroke="#375169" stroke-width="1.5">
+              <rect x="440" y="286" width="140" height="48" rx="22"/>
+              <rect x="610" y="286" width="140" height="48" rx="22"/>
+              <rect x="780" y="286" width="140" height="48" rx="22"/>
+              <rect x="950" y="286" width="140" height="48" rx="22"/>
+              <rect x="1120" y="286" width="140" height="48" rx="22"/>
+            </g>
+            <g id="nodesRanvier">
+              <circle class="node" data-node="1" cx="595" cy="310" r="11" fill="#243545" stroke="#496177" stroke-width="2"/>
+              <circle class="node" data-node="2" cx="765" cy="310" r="11" fill="#243545" stroke="#496177" stroke-width="2"/>
+              <circle class="node" data-node="3" cx="935" cy="310" r="11" fill="#243545" stroke="#496177" stroke-width="2"/>
+              <circle class="node" data-node="4" cx="1105" cy="310" r="11" fill="#243545" stroke="#496177" stroke-width="2"/>
+            </g>
+            <circle id="impulseDot" cx="430" cy="310" r="9" fill="var(--coral)" filter="url(#glowStrong)" opacity="0"/>
+            <line id="bareHighlight" class="bare-highlight" x1="430" y1="310" x2="1270" y2="310" stroke="url(#bareGrad)" stroke-width="16" stroke-linecap="round"/>
+            <text id="modeLabel" x="440" y="255" font-family="IBM Plex Mono, monospace" font-size="14" fill="#7f96a3" opacity="0"></text>
+          </g>
+
+          <g id="stageTerminal">
+            <path d="M1270,310 C1300,300 1320,270 1340,240" stroke="#33465a" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <path d="M1270,310 C1300,310 1325,310 1345,310" stroke="#33465a" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <path d="M1270,310 C1300,320 1320,350 1340,380" stroke="#33465a" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <g id="boutons" fill="#324356" stroke="#46607a" stroke-width="2">
+              <circle cx="1352" cy="232" r="20"/>
+              <circle cx="1357" cy="310" r="20"/>
+              <circle cx="1352" cy="388" r="20"/>
+            </g>
+            <g id="vesicles" fill="#5fd8b8">
+              <circle cx="1345" cy="300" r="5"/>
+              <circle cx="1358" cy="298" r="5"/>
+              <circle cx="1352" cy="312" r="5"/>
+              <circle cx="1364" cy="308" r="5"/>
+              <circle cx="1346" cy="316" r="5"/>
+            </g>
+          </g>
+
+          <g id="stageCleft">
+            <rect x="1378" y="270" width="60" height="80" fill="#0c141b" opacity="0.6"/>
+            <g id="ntDots" fill="var(--teal)" opacity="0"></g>
+          </g>
+
+          <g id="stagePost">
+            <path d="M1438,300 C1470,295 1500,290 1540,280" stroke="#3a5064" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <path d="M1438,320 C1470,325 1500,332 1545,340" stroke="#3a5064" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <path d="M1438,310 C1470,310 1500,310 1545,310" stroke="#3a5064" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <g id="receptors" fill="#3a5064" stroke="#527088" stroke-width="1.5">
+              <rect x="1432" y="292" width="10" height="16" rx="3"/>
+              <rect x="1432" y="303" width="10" height="16" rx="3"/>
+              <rect x="1432" y="316" width="10" height="16" rx="3"/>
+              <rect x="1432" y="328" width="10" height="16" rx="3"/>
+            </g>
+          </g>
+
+          <g class="hotspot-group" data-stage="dendrites">
+            <circle class="hotspot-ring" cx="140" cy="250" r="20"/>
+            <text class="hotspot-label" x="140" y="250">1</text>
+            <rect class="hotspot" data-stage="dendrites" x="0" y="90" width="330" height="450" rx="16"/>
+          </g>
+
+          <g class="hotspot-group" data-stage="hillock">
+            <circle class="hotspot-ring" cx="378" cy="230" r="20"/>
+            <text class="hotspot-label" x="378" y="230">2</text>
+            <rect class="hotspot" data-stage="hillock" x="330" y="230" width="110" height="160" rx="14"/>
+          </g>
+
+          <g class="hotspot-group" data-stage="axon">
+            <circle class="hotspot-ring" cx="850" cy="230" r="20"/>
+            <text class="hotspot-label" x="850" y="230">3</text>
+            <rect class="hotspot" data-stage="axon" x="440" y="230" width="830" height="170" rx="16"/>
+          </g>
+
+          <g class="hotspot-group" data-stage="terminal">
+            <circle class="hotspot-ring" cx="1310" cy="180" r="20"/>
+            <text class="hotspot-label" x="1310" y="180">4</text>
+            <rect class="hotspot" data-stage="terminal" x="1270" y="190" width="140" height="240" rx="14"/>
+          </g>
+
+          <g class="hotspot-group" data-stage="cleft">
+            <circle class="hotspot-ring" cx="1408" cy="220" r="20"/>
+            <text class="hotspot-label" x="1408" y="220">5</text>
+            <rect class="hotspot" data-stage="cleft" x="1372" y="255" width="72" height="110" rx="10"/>
+          </g>
+
+          <g class="hotspot-group" data-stage="postsynaptic">
+            <circle class="hotspot-ring" cx="1500" cy="220" r="20"/>
+            <text class="hotspot-label" x="1500" y="220">6</text>
+            <rect class="hotspot" data-stage="postsynaptic" x="1440" y="250" width="160" height="130" rx="12"/>
+          </g>
+
+          <g id="channelsLayer"></g>
+
+          <g id="labelsLayer"></g>
+
+        </svg>
+        <div class="zoom-hint" id="zoomHint">Click a numbered marker to zoom in</div>
+        <div class="legend">
+          <div class="legend-title">ION KEY</div>
+          <div class="legend-row"><span class="swatch" style="background:#ff6f4d"></span>Na⁺ sodium</div>
+          <div class="legend-row"><span class="swatch" style="background:#5b8def"></span>K⁺ potassium</div>
+          <div class="legend-row"><span class="swatch" style="background:#b78bff"></span>Ca²⁺ calcium</div>
+          <div class="legend-row"><span class="swatch" style="background:#45e0b3"></span>neurotransmitter</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+      <div id="infoDefault" class="placeholder">
+        Select a stage on the diagram (1–6) to learn what's happening there, then simulate it.
+      </div>
+      <div id="infoContent" style="display:none;">
+        <span class="eyebrow" id="infoEyebrow">01 · Dendrites</span>
+        <h2 id="infoTitle">Receiving input</h2>
+        <p id="infoBlurb">Nothing selected yet.</p>
+        <div id="infoTags"></div>
+        <button class="btn btn-simulate" id="simulateBtn">Simulate this stage</button>
+        <button class="btn btn-simulate" id="altBtn" style="display:none; background:linear-gradient(180deg, #3a2a20, #26180f); border-color:#7a3626; color:#ffd9c9;">Compare</button>
+        <div id="timingNote" style="display:none; margin-top:12px; font-size:12px; color:var(--text-dimmer); line-height:1.5; border-top:1px solid var(--line-soft); padding-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scope-card">
+    <div class="scope-head">
+      <span class="title" id="scopeTitle">Membrane potential: resting</span>
+      <span style="display:flex; gap:14px; align-items:baseline;">
+        <span class="reading mono" id="scopeElapsed" style="color:var(--text-dimmer); font-size:12px;"></span>
+        <span class="reading mono" id="scopeReading">−70 mV</span>
+      </span>
+    </div>
+    <canvas id="scope" width="1200" height="150"></canvas>
+  </div>
+
+  <footer class="credits"></footer>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('neuronSvg');
+  const baseViewBox = [0,0,1700,620];
+  let currentViewBox = baseViewBox.slice();
+  let animFrame = null;
+
+  const resetBtn = document.getElementById('resetBtn');
+  const zoomHint = document.getElementById('zoomHint');
+  const tracker = document.getElementById('tracker');
+  const infoDefault = document.getElementById('infoDefault');
+  const infoContent = document.getElementById('infoContent');
+  const infoEyebrow = document.getElementById('infoEyebrow');
+  const infoTitle = document.getElementById('infoTitle');
+  const infoBlurb = document.getElementById('infoBlurb');
+  const infoTags = document.getElementById('infoTags');
+  const simulateBtn = document.getElementById('simulateBtn');
+  const altBtn = document.getElementById('altBtn');
+  const timingNote = document.getElementById('timingNote');
+  const playAllBtn = document.getElementById('playAllBtn');
+  const scopeTitle = document.getElementById('scopeTitle');
+  const scopeReading = document.getElementById('scopeReading');
+  const scopeElapsed = document.getElementById('scopeElapsed');
+  const canvas = document.getElementById('scope');
+  const ctx = canvas.getContext('2d');
+
+  const STAGES = [
+    {
+      id: 'dendrites',
+      num: '01',
+      title: 'Receiving input',
+      viewBox: [-20, 60, 400, 500],
+      tags: ['Graded potential', 'Ligand-gated channels', 'Summation'],
+      blurb: "Dendrites pick up chemical signals from other neurons and turn them into small electrical nudges called graded potentials. Watch the two gates on the membrane: neurotransmitter binding pries them open, and sodium ions (orange) flow into the cell. Enough of these nudges add up in the cell body, and the combined signal heads toward the axon hillock.",
+      scopeTitle: 'Membrane potential: dendrites and soma',
+      waveform: 'graded',
+      altLabel: '⇢ Compare: inhibitory input (IPSP)',
+      altWaveform: 'ipsp',
+      altDur: 1900,
+      altColor: '#5b8def',
+      altFn: animateDendritesAlt,
+      altNote: "Not every signal excites the neuron. Some synapses are inhibitory. Instead of sodium rushing in, chloride channels open and push the membrane potential further from threshold. This is called an IPSP. These nudges work against the excitatory ones, making the neuron a little less likely to fire."
+    },
+    {
+      id: 'hillock',
+      num: '02',
+      title: 'Crossing the threshold',
+      viewBox: [280, 190, 260, 260],
+      tags: ['Threshold −55mV', 'Na⁺ / K⁺ gates', 'All-or-none'],
+      blurb: "The axon hillock is where the neuron makes its decision. It adds up all the incoming graded potentials, and if that total crosses about −55mV, the threshold, voltage-gated sodium gates burst open and orange ions rush in, firing a full action potential. A moment later those gates shut and potassium gates open instead, letting blue ions rush out and bringing the membrane back down. Below threshold, nothing happens at all. Above it, you get the same response every time. That's the all-or-none rule.",
+      scopeTitle: 'Membrane potential: axon hillock spike',
+      waveform: 'spike',
+      altLabel: '⇢ Compare: below threshold',
+      altWaveform: 'subthreshold',
+      altDur: 1800,
+      altColor: '#7f96a3',
+      altFn: animateHillockAlt,
+      altNote: "This stimulus never reaches −55mV, so the sodium gate only cracks open a little before closing again. Since action potentials are all-or-none, a subthreshold nudge like this doesn't produce a smaller spike. It just produces nothing."
+    },
+    {
+      id: 'axon',
+      num: '03',
+      title: 'Node to node',
+      viewBox: [400, 190, 900, 260],
+      tags: ['Saltatory conduction', 'Myelin', 'Nodes of Ranvier'],
+      blurb: "The action potential doesn't crawl smoothly down the axon. It hops. Myelin, made by glial cells, wraps long stretches of membrane in insulation, so the signal only has to regenerate itself at the gaps in between, called the nodes of Ranvier. This hopping is called saltatory conduction, and it lets the impulse travel much faster than it could on a bare axon. Try the buttons below to see both side by side.",
+      scopeTitle: 'Membrane potential: traveling impulse',
+      waveform: 'propagate',
+      altLabel: '⇢ Compare: without myelin',
+      altWaveform: 'propagateBare',
+      altDur: 5400,
+      altColor: '#ff6f4d',
+      altFn: animateAxonBare,
+      altNote: "Without myelin, the axon can't skip ahead. Every patch of membrane has to regenerate the action potential on its own, one after another. That's why the highlight above crawls the whole way instead of hopping, and why myelinated axons carry signals so much faster."
+    },
+    {
+      id: 'terminal',
+      num: '04',
+      title: 'Releasing the message',
+      viewBox: [1240, 160, 220, 300],
+      tags: ['Ca²⁺ gates', 'Synaptic vesicles', 'Fusion pore'],
+      blurb: "When the impulse reaches the axon terminal, voltage-gated calcium gates swing open and calcium floods in. That's the trigger for the vesicles, tiny sacs full of neurotransmitter, to drift down toward the membrane facing the synapse. There, a fusion pore opens and lets the neurotransmitter spill out into the cleft. This is the point where an electrical signal turns into a chemical one.",
+      scopeTitle: 'Calcium concentration: axon terminal',
+      waveform: 'calcium',
+      altLabel: '⇢ Compare: calcium channels blocked',
+      altWaveform: 'calciumBlocked',
+      altDur: 2900,
+      altColor: '#e05a4f',
+      altFn: animateTerminalAlt,
+      altNote: "Without calcium coming in, the vesicles never get the signal to fuse with the membrane. This isn't a slower release, it's no release at all. No neurotransmitter gets out, and the message dies right here. This is actually one way certain toxins and medications interrupt communication between neurons."
+    },
+    {
+      id: 'cleft',
+      num: '05',
+      title: 'Crossing the gap',
+      viewBox: [1340, 200, 160, 220],
+      tags: ['Diffusion', '~20nm gap'],
+      blurb: "Neurotransmitter released from the terminal drifts across the synaptic cleft, a gap only about 20 nanometers wide. In a fraction of a millisecond it reaches the membrane of the next neuron, ready to bind to waiting receptors.",
+      scopeTitle: 'Neurotransmitter concentration: synaptic cleft',
+      waveform: 'diffuse',
+      altLabel: '⇢ Compare: reuptake blocked',
+      altWaveform: 'diffuseBlocked',
+      altDur: 3300,
+      altColor: '#f5c542',
+      altFn: animateCleftAlt,
+      altNote: "Normally, transporters clear the neurotransmitter out of the cleft quickly, so the signal ends cleanly. Some drugs block that cleanup process. SSRIs do this to serotonin, for example. That leaves the neurotransmitter lingering and stimulating the receptor for much longer than usual."
+    },
+    {
+      id: 'postsynaptic',
+      num: '06',
+      title: 'Passing it on',
+      viewBox: [1400, 200, 300, 250],
+      tags: ['Receptor binding', 'New EPSP'],
+      blurb: "Neurotransmitter binds to receptors on the next neuron's dendrite, opening ion channels and creating a brand new graded potential there, an EPSP if it's excitatory. The whole process starts over again in this neighboring cell, one link further along the circuit.",
+      scopeTitle: "Membrane potential: next neuron's dendrite",
+      waveform: 'graded2',
+      altLabel: '⇢ Compare: receptors blocked',
+      altWaveform: 'postBlocked',
+      altDur: 1300,
+      altColor: '#e05a4f',
+      altFn: animatePostAlt,
+      altNote: "An antagonist molecule can sit in the receptor without activating it, physically keeping the real neurotransmitter from binding. No channels open, no new graded potential forms, and the message doesn't make it to this neuron at all."
+    }
+  ];
+
+  let activeStageIndex = null;
+  let completed = new Set();
+  let playingAll = false;
+
+  function buildTracker(){
+    tracker.innerHTML = '';
+    STAGES.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'dot';
+      el.dataset.idx = i;
+      el.innerHTML = `<span class="num">${i+1}</span><span>${s.title}</span>`;
+      el.addEventListener('click', () => selectStage(i));
+      tracker.appendChild(el);
+    });
+  }
+  function refreshTracker(){
+    [...tracker.children].forEach((el, i) => {
+      el.classList.toggle('active', i === activeStageIndex);
+      el.classList.toggle('done', completed.has(i) && i !== activeStageIndex);
+    });
+  }
+
+  function setViewBox(vb){
+    svg.setAttribute('viewBox', vb.join(' '));
+  }
+  function tweenViewBox(target, duration=650, onDone){
+    if(animFrame) cancelAnimationFrame(animFrame);
+    const start = currentViewBox.slice();
+    const t0 = performance.now();
+    function ease(t){ return 1 - Math.pow(1 - t, 3); }
+    function step(now){
+      const t = Math.min(1, (now - t0) / duration);
+      const e = ease(t);
+      const vb = start.map((v, i) => v + (target[i]-v)*e);
+      setViewBox(vb);
+      if(t < 1){
+        animFrame = requestAnimationFrame(step);
+      } else {
+        currentViewBox = target.slice();
+        if(onDone) onDone();
+      }
+    }
+    animFrame = requestAnimationFrame(step);
+  }
+
+  function selectStage(i){
+    activeStageIndex = i;
+    const s = STAGES[i];
+    infoDefault.style.display = 'none';
+    infoContent.style.display = 'flex';
+    infoContent.style.flexDirection = 'column';
+    infoEyebrow.textContent = s.num + ' · ' + labelFor(s.id);
+    infoTitle.textContent = s.title;
+    infoBlurb.textContent = s.blurb;
+    infoTags.innerHTML = s.tags.map(t => `<span class="info-tag">${t}</span>`).join('');
+    scopeTitle.textContent = s.scopeTitle;
+    simulateBtn.disabled = false;
+    simulateBtn.textContent = 'Simulate this stage';
+
+    if(s.altLabel){
+      altBtn.style.display = 'block';
+      altBtn.textContent = s.altLabel;
+      altBtn.disabled = false;
+    } else {
+      altBtn.style.display = 'none';
+    }
+    timingNote.style.display = 'none';
+    timingNote.textContent = '';
+    document.getElementById('modeLabel')?.setAttribute('opacity', 0);
+    if(document.getElementById('bareHighlight')) document.getElementById('bareHighlight').style.opacity = 0;
+    if(document.getElementById('myelinSegments')) document.getElementById('myelinSegments').style.opacity = 1;
+    document.querySelectorAll('.channel').forEach(ch => {
+      ch.classList.remove('open', 'partial-open', 'blocked');
+      ch.querySelectorAll('.ion-orb').forEach(o => o.remove());
+    });
+
+    document.querySelectorAll('.hotspot-group').forEach(g => g.classList.toggle('active', g.dataset.stage === s.id));
+
+    tweenViewBox(s.viewBox);
+    resetBtn.style.display = 'inline-block';
+    zoomHint.style.display = 'none';
+    refreshTracker();
+    drawIdleScope(s.waveform);
+  }
+
+  function labelFor(id){
+    const map = {dendrites:'Dendrites & Soma', hillock:'Axon Hillock', axon:'Axon / Nodes of Ranvier', terminal:'Axon Terminal', cleft:'Synaptic Cleft', postsynaptic:'Postsynaptic Dendrite'};
+    return map[id] || id;
+  }
+
+  function resetView(){
+    activeStageIndex = null;
+    tweenViewBox(baseViewBox);
+    resetBtn.style.display = 'none';
+    zoomHint.style.display = 'block';
+    infoDefault.style.display = 'block';
+    infoContent.style.display = 'none';
+    document.querySelectorAll('.hotspot-group').forEach(g => g.classList.remove('active'));
+    refreshTracker();
+  }
+
+  document.querySelectorAll('.hotspot').forEach(h => {
+    h.addEventListener('click', () => {
+      const idx = STAGES.findIndex(s => s.id === h.dataset.stage);
+      if(idx > -1) selectStage(idx);
+    });
+  });
+  resetBtn.addEventListener('click', resetView);
+  buildTracker();
+
+  const W = canvas.width, H = canvas.height;
+  const padL = 46, padR = 14, padT = 14, padB = 22;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  function mvToY(mv){
+    const min = -90, max = 40;
+    const frac = (mv - min) / (max - min);
+    return padT + plotH * (1 - frac);
+  }
+
+  function clearScope(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a0f14';
+    ctx.fillRect(0,0,W,H);
+  }
+
+  function drawAxes(mode){
+    ctx.save();
+    ctx.strokeStyle = '#1a2530';
+    ctx.lineWidth = 1;
+    ctx.font = '11px IBM Plex Mono, monospace';
+    ctx.fillStyle = '#55677a';
+
+    if(mode === 'voltage'){
+      const marks = [-90,-70,-55,-30,0,30];
+      marks.forEach(mv => {
+        const y = mvToY(mv);
+        ctx.beginPath();
+        ctx.moveTo(padL, y); ctx.lineTo(W-padR, y);
+        ctx.strokeStyle = mv === -55 ? '#4a3626' : '#161f28';
+        ctx.setLineDash(mv === -55 ? [5,4] : []);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = mv === -55 ? '#c78a5e' : '#55677a';
+        ctx.fillText(mv + '', 6, y+4);
+      });
+    } else {
+      const marks = [0,25,50,75,100];
+      marks.forEach(v => {
+        const y = padT + plotH * (1 - v/100);
+        ctx.beginPath();
+        ctx.moveTo(padL, y); ctx.lineTo(W-padR, y);
+        ctx.strokeStyle = '#161f28';
+        ctx.stroke();
+        ctx.fillText(v+'%', 6, y+4);
+      });
+    }
+    ctx.restore();
+  }
+
+  function wf_graded(p){
+    const b1 = Math.exp(-Math.pow((p-0.3)*10,2)) * 10;
+    const b2 = Math.exp(-Math.pow((p-0.65)*10,2)) * 14;
+    return -70 + b1 + b2;
+  }
+  function wf_graded2(p){
+    const b1 = Math.exp(-Math.pow((p-0.5)*8,2)) * 15;
+    return -70 + b1;
+  }
+  function wf_ipsp(p){
+    const b1 = Math.exp(-Math.pow((p-0.3)*10,2)) * 8;
+    const b2 = Math.exp(-Math.pow((p-0.65)*10,2)) * 11;
+    return -70 - b1 - b2;
+  }
+  function apShape(p){
+    if(p < 0.15){
+      return -70 + (p/0.15)*15;
+    } else if(p < 0.3){
+      const t=(p-0.15)/0.15;
+      return -55 + t*t*(85);
+    } else if(p < 0.5){
+      const t=(p-0.3)/0.2;
+      return 30 - t*(115);
+    } else if(p < 0.75){
+      const t=(p-0.5)/0.25;
+      return -85 + t*15;
+    } else {
+      return -70;
+    }
+  }
+  function wf_spike(p){ return apShape(p); }
+  function wf_subthreshold(p){
+    const b = Math.exp(-Math.pow((p-0.4)*6,2)) * 12;
+    return -70 + b;
+  }
+  function wf_propagate(p){
+    const seg = 1/4;
+    const local = (p % seg) / seg;
+    return apShape(local);
+  }
+  function wf_propagate_bare(p){
+    const seg = 1/16;
+    const local = (p % seg) / seg;
+    return apShape(local);
+  }
+  function wf_calcium(p){
+    if(p < 0.35) return (p/0.35)*90;
+    if(p < 0.6) return 90 - (p-0.35)*10;
+    return Math.max(0, 87 - (p-0.6)*200);
+  }
+  function wf_calcium_blocked(p){
+    return 4 + Math.sin(p*30) * 1.5;
+  }
+  function wf_diffuse(p){
+    const b = Math.exp(-Math.pow((p-0.45)*4.2,2))*100;
+    return b;
+  }
+  function wf_diffuse_blocked(p){
+    if(p < 0.25) return (p/0.25)*100;
+    if(p < 0.85) return 100 - (p-0.25)*18;
+    return Math.max(35, 89 - (p-0.25)*18);
+  }
+  function wf_post_blocked(p){
+    return -70;
+  }
+
+  const WF = {
+    graded: {fn: wf_graded, mode:'voltage', unit:'mV'},
+    graded2:{fn: wf_graded2, mode:'voltage', unit:'mV'},
+    ipsp: {fn: wf_ipsp, mode:'voltage', unit:'mV'},
+    spike:  {fn: wf_spike, mode:'voltage', unit:'mV'},
+    subthreshold: {fn: wf_subthreshold, mode:'voltage', unit:'mV'},
+    propagate:{fn: wf_propagate, mode:'voltage', unit:'mV'},
+    propagateBare:{fn: wf_propagate_bare, mode:'voltage', unit:'mV'},
+    calcium:{fn: wf_calcium, mode:'pct', unit:'%'},
+    calciumBlocked:{fn: wf_calcium_blocked, mode:'pct', unit:'%'},
+    diffuse:{fn: wf_diffuse, mode:'pct', unit:'%'},
+    diffuseBlocked:{fn: wf_diffuse_blocked, mode:'pct', unit:'%'},
+    postBlocked:{fn: wf_post_blocked, mode:'voltage', unit:'mV'}
+  };
+
+  function plotPoint(p, val, mode, color){
+    const x = padL + plotW * p;
+    let y;
+    if(mode === 'voltage') y = mvToY(val);
+    else y = padT + plotH * (1 - val/100);
+    return {x,y};
+  }
+
+  function drawIdleScope(waveKey){
+    const w = WF[waveKey] || WF.graded;
+    clearScope();
+    drawAxes(w.mode);
+    ctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const p = i/200;
+      const val = w.fn(p);
+      const pt = plotPoint(p, val, w.mode);
+      if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.strokeStyle = 'rgba(69,224,179,0.18)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const startVal = w.fn(0);
+    scopeReading.textContent = (w.mode==='voltage' ? Math.round(startVal)+' mV' : Math.round(startVal)+'%');
+    scopeElapsed.textContent = '';
+  }
+
+  let scopeRAF = null;
+  function animateScope(waveKey, duration, color, onDone){
+    const w = WF[waveKey] || WF.graded;
+    const t0 = performance.now();
+    if(scopeRAF) cancelAnimationFrame(scopeRAF);
+    function frame(now){
+      const t = Math.min(1, (now-t0)/duration);
+      clearScope();
+      drawAxes(w.mode);
+      ctx.beginPath();
+      const steps = 260;
+      for(let i=0;i<=steps;i++){
+        const p = (i/steps) * t;
+        if(p > t) break;
+        const val = w.fn(p);
+        const pt = plotPoint(p, val, w.mode, color);
+        if(i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      const curVal = w.fn(t);
+      const pt = plotPoint(t, curVal, w.mode, color);
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      scopeReading.textContent = (w.mode==='voltage' ? Math.round(curVal)+' mV' : Math.round(curVal)+'%');
+      scopeElapsed.textContent = Math.round(t*duration) + ' ms elapsed';
+
+      if(t < 1){
+        scopeRAF = requestAnimationFrame(frame);
+      } else if(onDone){
+        onDone();
+      }
+    }
+    scopeRAF = requestAnimationFrame(frame);
+  }
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const CHANNELS = [
+    { id:'chSomaTop',   cx:255,  cy:216, rot:0,   color:'#ff6f4d' },
+    { id:'chSomaLeft',  cx:163,  cy:310, rot:270, color:'#ff6f4d' },
+    { id:'chHillockNa', cx:352,  cy:263, rot:0,   color:'#ff6f4d' },
+    { id:'chHillockK',  cx:352,  cy:359, rot:180, color:'#5b8def', reverse:true },
+    { id:'chCaA',       cx:1374, cy:281, rot:30,  color:'#b78bff' },
+    { id:'chCaB',       cx:1340, cy:281, rot:-30, color:'#b78bff' },
+    { id:'chFusion',    cx:1357, cy:344, rot:180, color:'#45e0b3', reverse:true }
+  ];
+
+  function buildChannels(){
+    const layer = document.getElementById('channelsLayer');
+    CHANNELS.forEach(ch => {
+      const g = document.createElementNS(SVGNS, 'g');
+      g.setAttribute('id', ch.id);
+      g.setAttribute('class', 'channel');
+      g.setAttribute('transform', `translate(${ch.cx},${ch.cy}) rotate(${ch.rot})`);
+      if(ch.reverse) g.dataset.reverse = '1';
+
+      const base = document.createElementNS(SVGNS, 'rect');
+      base.setAttribute('class', 'gate-base');
+      base.setAttribute('x', -15); base.setAttribute('y', 8);
+      base.setAttribute('width', 30); base.setAttribute('height', 7);
+      base.setAttribute('rx', 2);
+      g.appendChild(base);
+
+      const left = document.createElementNS(SVGNS, 'path');
+      left.setAttribute('class', 'flap flap-left');
+      left.setAttribute('d', 'M -12,10 L 0,10 L 0,-9 Z');
+      g.appendChild(left);
+
+      const right = document.createElementNS(SVGNS, 'path');
+      right.setAttribute('class', 'flap flap-right');
+      right.setAttribute('d', 'M 0,10 L 12,10 L 0,-9 Z');
+      g.appendChild(right);
+
+      layer.appendChild(g);
+    });
+  }
+
+  function setChannelOpen(id, open){
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('open', open);
+  }
+
+  function spawnOrb(channelId, color, duration, delay){
+    delay = delay || 0;
+    setTimeout(() => {
+      const g = document.getElementById(channelId);
+      if(!g) return;
+      const reverse = g.dataset.reverse === '1';
+      const startY = reverse ? 26 : -22;
+      const endY = reverse ? -22 : 26;
+      const orb = document.createElementNS(SVGNS, 'circle');
+      orb.setAttribute('class', 'ion-orb');
+      orb.setAttribute('r', 4);
+      orb.setAttribute('fill', color);
+      orb.setAttribute('cx', 0);
+      orb.setAttribute('cy', startY);
+      g.appendChild(orb);
+      const t0 = performance.now();
+      function step(now){
+        const t = Math.min(1, (now - t0) / duration);
+        orb.setAttribute('cy', startY + (endY - startY) * t);
+        orb.setAttribute('opacity', t < 0.85 ? 1 : (1 - (t-0.85)/0.15));
+        if(t < 1) requestAnimationFrame(step); else orb.remove();
+      }
+      requestAnimationFrame(step);
+    }, delay);
+  }
+
+  function spawnOrbBounce(channelId, color, peakY, duration, delay){
+    delay = delay || 0;
+    setTimeout(() => {
+      const g = document.getElementById(channelId);
+      if(!g) return;
+      const orb = document.createElementNS(SVGNS, 'circle');
+      orb.setAttribute('class', 'ion-orb');
+      orb.setAttribute('r', 3.5);
+      orb.setAttribute('fill', color);
+      orb.setAttribute('cx', 0);
+      orb.setAttribute('cy', -22);
+      g.appendChild(orb);
+      const t0 = performance.now();
+      function step(now){
+        const t = Math.min(1, (now - t0) / duration);
+        const y = t < 0.5
+          ? -22 + (peakY - -22) * (t/0.5)
+          : peakY + (-22 - peakY) * ((t-0.5)/0.5);
+        orb.setAttribute('cy', y);
+        orb.setAttribute('opacity', 0.85);
+        if(t < 1) requestAnimationFrame(step); else orb.remove();
+      }
+      requestAnimationFrame(step);
+    }, delay);
+  }
+
+  buildChannels();
+
+  const LABELS = [
+    { x:34,  y:145, text:'Dendrite',            color:'#8CA2AD' },
+    { x:150, y:435, text:'Soma (cell body)',     color:'#8CA2AD' },
+    { x:272, y:305, text:'Nucleus',              color:'#8CA2AD', size:11 },
+    { x:198, y:186, text:'Na⁺ channel',          color:'#ff6f4d' },
+    { x:30,  y:345, text:'Na⁺ channel',          color:'#ff6f4d' },
+
+    { x:316, y:400, text:'Axon hillock',         color:'#8CA2AD' },
+    { x:397, y:258, text:'Na⁺ channel (voltage-gated)', color:'#ff6f4d', size:12 },
+    { x:397, y:366, text:'K⁺ channel (voltage-gated)',  color:'#5b8def', size:12 },
+
+    { x:850, y:352, text:'Axon',                 color:'#8CA2AD' },
+    { x:452, y:274, text:'Myelin sheath',         color:'#8CA2AD' },
+    { x:558, y:274, text:'Node of Ranvier',       color:'#8CA2AD' },
+
+    { x:1244, y:206, text:'Axon terminal',        color:'#8CA2AD', size:12 },
+    { x:1244, y:250, text:'Ca²⁺ channels',        color:'#b78bff', size:12 },
+    { x:1244, y:300, text:'Synaptic vesicle',     color:'#8CA2AD', size:12 },
+    { x:1244, y:352, text:'Fusion pore (releases NT)', color:'#45e0b3', size:12 },
+
+    { x:1378, y:398, text:'Synaptic cleft',       color:'#8CA2AD' },
+
+    { x:1445, y:282, text:'Receptor',             color:'#8CA2AD' },
+    { x:1455, y:352, text:'Postsynaptic dendrite',color:'#8CA2AD' },
+    { x:1548, y:216, text:'Next neuron',          color:'#8CA2AD', size:11 }
+  ];
+
+  const LEADERS = [
+    { x1:1300, y1:206, x2:1330, y2:198 },
+    { x1:1300, y1:248, x2:1352, y2:275 },
+    { x1:1300, y1:298, x2:1350, y2:303 },
+    { x1:1300, y1:350, x2:1350, y2:344 },
+    { x1:1400, y1:392, x2:1408, y2:350 }
+  ];
+
+  function buildLabels(){
+    const layer = document.getElementById('labelsLayer');
+    LEADERS.forEach(ld => {
+      const line = document.createElementNS(SVGNS, 'line');
+      line.setAttribute('class', 'leader-line');
+      line.setAttribute('x1', ld.x1); line.setAttribute('y1', ld.y1);
+      line.setAttribute('x2', ld.x2); line.setAttribute('y2', ld.y2);
+      layer.appendChild(line);
+    });
+    LABELS.forEach(l => {
+      const t = document.createElementNS(SVGNS, 'text');
+      t.setAttribute('class', 'struct-label');
+      t.setAttribute('x', l.x);
+      t.setAttribute('y', l.y);
+      t.setAttribute('font-size', l.size || 13);
+      t.setAttribute('fill', l.color || '#8CA2AD');
+      t.textContent = l.text;
+      layer.appendChild(t);
+    });
+  }
+  buildLabels();
+
+  function animateDendrites(done){
+    const tips = document.querySelectorAll('#dendriteTips circle');
+    tips.forEach((tip,idx)=>{
+      setTimeout(()=>{
+        tip.style.transition='fill .3s ease, r .3s ease';
+        tip.setAttribute('fill','#5fe8c4');
+        tip.setAttribute('r',7);
+        setTimeout(()=>{ tip.setAttribute('fill','#3a5064'); tip.setAttribute('r',4); }, 500);
+      }, idx*90);
+    });
+
+    setChannelOpen('chSomaTop', true);
+    setChannelOpen('chSomaLeft', true);
+    spawnOrb('chSomaTop', '#ff6f4d', 500, 150);
+    spawnOrb('chSomaTop', '#ff6f4d', 500, 500);
+    spawnOrb('chSomaLeft', '#ff6f4d', 500, 300);
+    spawnOrb('chSomaLeft', '#ff6f4d', 500, 650);
+    setTimeout(()=>{
+      setChannelOpen('chSomaTop', false);
+      setChannelOpen('chSomaLeft', false);
+    }, 1300);
+
+    const soma = document.getElementById('somaBody');
+    setTimeout(()=>{
+      soma.style.transition='filter .4s ease';
+      soma.setAttribute('filter','url(#glowSoft)');
+      soma.setAttribute('stroke', '#45e0b3');
+      setTimeout(()=>{ soma.removeAttribute('filter'); soma.setAttribute('stroke','#2f4a40'); }, 700);
+    }, 800);
+    setTimeout(done, 1900);
+  }
+
+  function animateDendritesAlt(done){
+    showModeLabel(30, 500, 'IPSP: pushes away from threshold. Still just a nudge, not a stop.', '#5b8def');
+
+    const tips = document.querySelectorAll('#dendriteTips circle');
+    tips.forEach((tip,idx)=>{
+      setTimeout(()=>{
+        tip.style.transition='fill .3s ease, r .3s ease';
+        tip.setAttribute('fill','#5b8def');
+        tip.setAttribute('r',7);
+        setTimeout(()=>{ tip.setAttribute('fill','#3a5064'); tip.setAttribute('r',4); }, 500);
+      }, idx*90);
+    });
+
+    setChannelOpen('chSomaTop', true);
+    setChannelOpen('chSomaLeft', true);
+    spawnOrb('chSomaTop', '#5b8def', 500, 150);
+    spawnOrb('chSomaTop', '#5b8def', 500, 500);
+    spawnOrb('chSomaLeft', '#5b8def', 500, 300);
+    spawnOrb('chSomaLeft', '#5b8def', 500, 650);
+    setTimeout(()=>{
+      setChannelOpen('chSomaTop', false);
+      setChannelOpen('chSomaLeft', false);
+    }, 1300);
+
+    const soma = document.getElementById('somaBody');
+    setTimeout(()=>{
+      soma.style.transition = 'r .5s ease, stroke .4s ease';
+      soma.setAttribute('r', 87);
+      soma.setAttribute('stroke', '#5b8def');
+      setTimeout(()=>{ soma.setAttribute('r', 92); soma.setAttribute('stroke','#2f4a40'); }, 800);
+    }, 800);
+    setTimeout(()=>{ hideModeLabel(); done(); }, 1900);
+  }
+
+  function animateHillock(done){
+    const h = document.getElementById('hillockShape');
+    h.style.transition = 'fill .3s ease';
+
+    setChannelOpen('chHillockNa', true);
+    spawnOrb('chHillockNa', '#ff6f4d', 320, 200);
+    spawnOrb('chHillockNa', '#ff6f4d', 320, 420);
+    setTimeout(()=>{
+      h.setAttribute('fill', '#ff6f4d');
+      document.getElementById('somaBody')?.setAttribute('filter','url(#glowSoft)');
+    }, 300);
+
+    setTimeout(()=>{
+      setChannelOpen('chHillockNa', false);
+      setChannelOpen('chHillockK', true);
+      spawnOrb('chHillockK', '#5b8def', 340, 150);
+      spawnOrb('chHillockK', '#5b8def', 340, 380);
+    }, 700);
+
+    setTimeout(()=>{
+      h.setAttribute('fill', '#324356');
+      document.getElementById('somaBody').removeAttribute('filter');
+    }, 1200);
+    setTimeout(()=>{ setChannelOpen('chHillockK', false); }, 1450);
+    setTimeout(done, 1800);
+  }
+
+  function animateHillockAlt(done){
+    showModeLabel(290, 410, 'Below threshold: gate barely opens. No spike fires at all.', '#7f96a3');
+    const h = document.getElementById('hillockShape');
+    h.style.transition = 'fill .25s ease';
+    const ch = document.getElementById('chHillockNa');
+    ch.classList.add('partial-open');
+    spawnOrbBounce('chHillockNa', '#ff6f4d', 2, 500, 250);
+    setTimeout(()=>{
+      h.setAttribute('fill', '#3d4a58');
+      setTimeout(()=>{ h.setAttribute('fill', '#324356'); }, 350);
+    }, 400);
+    setTimeout(()=>{ ch.classList.remove('partial-open'); }, 900);
+    setTimeout(()=>{ hideModeLabel(); done(); }, 1800);
+  }
+
+  function animateAxon(done){
+    const dot = document.getElementById('impulseDot');
+    const nodes = document.querySelectorAll('#nodesRanvier .node');
+    const path = [ {x:430,y:310}, {x:595,y:310}, {x:765,y:310}, {x:935,y:310}, {x:1105,y:310}, {x:1270,y:310} ];
+    dot.setAttribute('opacity', 1);
+    let i = 0;
+    function hop(){
+      if(i >= path.length){
+        dot.setAttribute('opacity', 0);
+        nodes.forEach(n=>n.setAttribute('fill','#243545'));
+        done();
+        return;
+      }
+      const pt = path[i];
+      dot.setAttribute('cx', pt.x);
+      dot.setAttribute('cy', pt.y);
+      if(i>0 && i<=4 && nodes[i-1]){
+        nodes[i-1].setAttribute('fill', '#ff6f4d');
+        setTimeout(()=>{ if(nodes[i-1]) nodes[i-1].setAttribute('fill','#243545'); }, 320);
+      }
+      i++;
+      setTimeout(hop, 190);
+    }
+    hop();
+  }
+
+  function showModeLabel(x, y, text, color){
+    const label = document.getElementById('modeLabel');
+    if(!label) return;
+    label.setAttribute('x', x);
+    label.setAttribute('y', y);
+    label.setAttribute('fill', color || '#7f96a3');
+    label.textContent = text;
+    label.setAttribute('opacity', 1);
+  }
+  function hideModeLabel(){
+    document.getElementById('modeLabel')?.setAttribute('opacity', 0);
+  }
+
+  function animateAxonBare(done){
+    const highlight = document.getElementById('bareHighlight');
+    const myelin = document.getElementById('myelinSegments');
+    const nodes = document.querySelectorAll('#nodesRanvier .node');
+
+    showModeLabel(440, 255, 'No myelin: crawling, patch by patch. Slower, not blocked.', '#ff6f4d');
+    myelin.style.opacity = 0.1;
+    nodes.forEach(n => n.setAttribute('opacity', 0.15));
+    highlight.style.opacity = 1;
+
+    const startX = 430, endX = 1270, bandWidth = 90, duration = 5400;
+    const grad = document.getElementById('bareGrad');
+    const t0 = performance.now();
+    function step(now){
+      const t = Math.min(1, (now - t0) / duration);
+      const x = startX + (endX - startX - bandWidth) * t;
+      grad.setAttribute('x1', x);
+      grad.setAttribute('x2', x + bandWidth);
+      if(t < 1){
+        requestAnimationFrame(step);
+      } else {
+        highlight.style.opacity = 0;
+        myelin.style.opacity = 1;
+        nodes.forEach(n => n.setAttribute('opacity', 1));
+        hideModeLabel();
+        done();
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function animateTerminal(done){
+    const vesicles = document.querySelectorAll('#vesicles circle');
+    const origPos = [ {x:1345,y:300}, {x:1358,y:298}, {x:1352,y:312}, {x:1364,y:308}, {x:1346,y:316} ];
+    const boutonMid = document.querySelector('#boutons circle:nth-child(2)');
+    if(boutonMid) boutonMid.style.transition = 'fill .3s ease';
+
+    vesicles.forEach((v, idx)=>{
+      v.style.transition = 'none';
+      v.setAttribute('cx', origPos[idx].x);
+      v.setAttribute('cy', origPos[idx].y);
+      v.setAttribute('opacity', 1);
+    });
+
+    setChannelOpen('chCaA', true);
+    setChannelOpen('chCaB', true);
+    spawnOrb('chCaA', '#b78bff', 450, 150);
+    spawnOrb('chCaB', '#b78bff', 450, 320);
+    setTimeout(()=>{
+      setChannelOpen('chCaA', false);
+      setChannelOpen('chCaB', false);
+      if(boutonMid) boutonMid.setAttribute('fill', '#3d5a4e');
+    }, 750);
+
+    setTimeout(()=>{
+      vesicles.forEach((v, idx)=>{
+        v.style.transition = 'cx .5s ease, cy .5s ease';
+        v.setAttribute('cx', 1350 + (idx-2)*5);
+        v.setAttribute('cy', 336);
+      });
+    }, 850);
+
+    setTimeout(()=>{
+      setChannelOpen('chFusion', true);
+      vesicles.forEach(v => { v.style.transition = 'opacity .3s ease'; v.setAttribute('opacity', 0); });
+      for(let i=0;i<6;i++) spawnOrb('chFusion', '#45e0b3', 520, i*70);
+    }, 1550);
+
+    setTimeout(()=>{ setChannelOpen('chFusion', false); }, 2300);
+
+    setTimeout(()=>{
+      if(boutonMid) boutonMid.setAttribute('fill', '#324356');
+      vesicles.forEach((v, idx)=>{
+        v.style.transition = 'none';
+        v.setAttribute('cx', origPos[idx].x);
+        v.setAttribute('cy', origPos[idx].y);
+        v.setAttribute('opacity', 1);
+      });
+    }, 2700);
+    setTimeout(done, 2900);
+  }
+
+  function animateTerminalAlt(done){
+    showModeLabel(1244, 430, 'Calcium blocked: stopped, not slowed. Vesicles never fuse.', '#e05a4f');
+
+    const vesicles = document.querySelectorAll('#vesicles circle');
+    const origPos = [ {x:1345,y:300}, {x:1358,y:298}, {x:1352,y:312}, {x:1364,y:308}, {x:1346,y:316} ];
+    vesicles.forEach((v, idx)=>{
+      v.style.transition = 'none';
+      v.setAttribute('cx', origPos[idx].x);
+      v.setAttribute('cy', origPos[idx].y);
+      v.setAttribute('opacity', 1);
+    });
+
+    const chA = document.getElementById('chCaA');
+    const chB = document.getElementById('chCaB');
+    chA.classList.add('blocked');
+    chB.classList.add('blocked');
+    setTimeout(()=>{
+      chA.classList.remove('blocked');
+      chB.classList.remove('blocked');
+    }, 900);
+    setTimeout(()=>{ hideModeLabel(); done(); }, 2900);
+  }
+
+  function animateCleft(done){
+    const g = document.getElementById('ntDots');
+    g.setAttribute('opacity', 1);
+    g.innerHTML = '';
+    const dots = [];
+    for(let i=0;i<6;i++){
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', 1390);
+      c.setAttribute('cy', 290 + (i%3)*20);
+      c.setAttribute('r', 4);
+      c.setAttribute('fill', '#45e0b3');
+      g.appendChild(c);
+      dots.push(c);
+    }
+    dots.forEach((d, idx)=>{
+      setTimeout(()=>{
+        d.style.transition = 'cx 1s ease';
+        d.setAttribute('cx', 1430);
+      }, idx*80);
+    });
+    setTimeout(()=>{ g.setAttribute('opacity', 0); }, 1600);
+    setTimeout(done, 1900);
+  }
+
+  function animateCleftAlt(done){
+    showModeLabel(1345, 405, 'Reuptake blocked: clears much slower, not stopped.', '#f5c542');
+    const g = document.getElementById('ntDots');
+    g.setAttribute('opacity', 1);
+    g.innerHTML = '';
+    const dots = [];
+    for(let i=0;i<6;i++){
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', 1390);
+      c.setAttribute('cy', 290 + (i%3)*20);
+      c.setAttribute('r', 4);
+      c.setAttribute('fill', '#f5c542');
+      g.appendChild(c);
+      dots.push(c);
+    }
+    dots.forEach((d, idx)=>{
+      setTimeout(()=>{
+        d.style.transition = 'cx 1s ease';
+        d.setAttribute('cx', 1428 + (idx%3));
+      }, idx*80);
+    });
+    let pulseCount = 0;
+    const pulseTimer = setInterval(()=>{
+      pulseCount++;
+      dots.forEach(d => d.setAttribute('opacity', pulseCount % 2 ? 0.55 : 1));
+    }, 260);
+    setTimeout(()=>{
+      clearInterval(pulseTimer);
+      g.setAttribute('opacity', 0);
+    }, 3000);
+    setTimeout(()=>{ hideModeLabel(); done(); }, 3300);
+  }
+
+  function animatePost(done){
+    const receptors = document.querySelectorAll('#receptors rect');
+    receptors.forEach((r, idx)=>{
+      setTimeout(()=>{
+        r.style.transition = 'fill .3s ease';
+        r.setAttribute('fill', '#45e0b3');
+        setTimeout(()=>r.setAttribute('fill', '#3a5064'), 500);
+      }, idx*120);
+    });
+    setTimeout(done, 1300);
+  }
+
+  function animatePostAlt(done){
+    showModeLabel(1410, 430, 'Receptor blocked: stopped. No new potential forms.', '#e05a4f');
+    const receptors = document.querySelectorAll('#receptors rect');
+    receptors.forEach((r, idx)=>{
+      setTimeout(()=>{
+        r.style.transition = 'fill .3s ease';
+        r.setAttribute('fill', '#e05a4f');
+        setTimeout(()=>r.setAttribute('fill', '#3a5064'), 500);
+      }, idx*120);
+    });
+    setTimeout(()=>{ hideModeLabel(); done(); }, 1300);
+  }
+
+  const ANIMATORS = {
+    dendrites: {fn: animateDendrites, wave:'graded', color:'#45e0b3', dur:1900},
+    hillock: {fn: animateHillock, wave:'spike', color:'#ff6f4d', dur:1800},
+    axon: {fn: animateAxon, wave:'propagate', color:'#ff6f4d', dur:1150},
+    terminal: {fn: animateTerminal, wave:'calcium', color:'#b78bff', dur:2900},
+    cleft: {fn: animateCleft, wave:'diffuse', color:'#45e0b3', dur:1900},
+    postsynaptic: {fn: animatePost, wave:'graded2', color:'#45e0b3', dur:1300}
+  };
+
+  function runStageSimulation(idx, cb){
+    const s = STAGES[idx];
+    const A = ANIMATORS[s.id];
+    simulateBtn.disabled = true;
+    simulateBtn.textContent = 'Simulating…';
+    animateScope(A.wave, A.dur, A.color);
+    A.fn(()=>{
+      completed.add(idx);
+      refreshTracker();
+      simulateBtn.disabled = false;
+      simulateBtn.textContent = 'Run again';
+      if(cb) cb();
+    });
+  }
+
+  simulateBtn.addEventListener('click', ()=>{
+    if(activeStageIndex === null) return;
+    runStageSimulation(activeStageIndex);
+  });
+
+  altBtn.addEventListener('click', ()=>{
+    if(activeStageIndex === null) return;
+    const s = STAGES[activeStageIndex];
+    if(!s.altLabel || !s.altFn) return;
+    altBtn.disabled = true;
+    simulateBtn.disabled = true;
+    altBtn.textContent = 'Simulating…';
+    animateScope(s.altWaveform, s.altDur, s.altColor || '#ff6f4d');
+    s.altFn(()=>{
+      altBtn.disabled = false;
+      simulateBtn.disabled = false;
+      altBtn.textContent = s.altLabel;
+      if(s.altNote){
+        timingNote.textContent = s.altNote;
+        timingNote.style.display = 'block';
+      }
+    });
+  });
+
+  playAllBtn.addEventListener('click', ()=>{
+    if(playingAll) return;
+    playingAll = true;
+    playAllBtn.disabled = true;
+    playAllBtn.textContent = '▶ Running…';
+    let i = 0;
+    function nextStage(){
+      if(i >= STAGES.length){
+        playingAll = false;
+        playAllBtn.disabled = false;
+        playAllBtn.textContent = '▶ Run full impulse';
+        return;
+      }
+      selectStage(i);
+      setTimeout(()=>{
+        runStageSimulation(i, ()=>{
+          i++;
+          setTimeout(nextStage, 450);
+        });
+      }, 700);
+    }
+    nextStage();
+  });
+
+  setViewBox(baseViewBox);
+  drawIdleScope('graded');
+  refreshTracker();
+})();
+</script>
+</body>
+</html>
